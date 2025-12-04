@@ -1,4 +1,5 @@
 // src/types.ts
+
 export const ItemTypes = {
   TOOL: "tool",
   FIELD: "field",
@@ -13,25 +14,24 @@ export type FieldType =
   | "select"
   | "date"
   | "signature"
-  | "complex-table"
-  | "dynamic-table"
-  | "panel"; // NEW
+  | "panel";
 
-export interface TableColumn {
-  id: string;
-  header: string;
-  width?: string;
-}
+export type DateFormat =
+  | "MM/DD/YYYY"
+  | "DD/MM/YYYY"
+  | "YYYY-MM-DD"
+  | "DD-MM-YYYY"
+  | "MM-DD-YYYY";
 
 export interface FormField {
   id: string;
   type: FieldType;
   label: string;
   value?: any;
-  required?: boolean;
   placeholder?: string;
-
-  // Style Props
+  required?: boolean;
+  options?: Array<{ label: string; value: string }>;
+  helperText?: string;
   showLabel?: boolean;
   labelBold?: boolean;
   labelItalic?: boolean;
@@ -39,38 +39,20 @@ export interface FormField {
   labelSize?: number;
   underline?: boolean;
   borderBottom?: boolean;
-
-  // Field styling
-  fieldSize?: "small" | "medium" | "large";
-  helperText?: string;
-
-  // Options for Radio/Checkbox/Select
-  options?: string[];
-  listStyle?: "none" | "numbered" | "alpha";
-  direction?: "row" | "column" | "grid";
+  size?: "small" | "medium" | "large";
+  layoutDirection?: "row" | "column" | "grid";
   gridColumns?: number;
-
-  // Description Content
+  width?: "full" | "half" | "third" | "quarter" | "custom";
+  customWidth?: string;
+  dateFormat?: DateFormat;
   content?: string;
 
-  // Table Data
-  columns?: TableColumn[];
-  tableData?: Array<Record<string, string>>;
-  rows?: any[];
-
-  // Panel Properties (NEW)
-  panelWidth?: "full" | "half" | "third" | "two-thirds" | "quarter" | "custom";
-  customWidth?: number; // Percentage for custom width
-  columnsPerRow?: number; // How many fields can fit in one row
-  children?: FormField[]; // Nested fields inside panel
+  // Panel-specific properties
+  children?: FormField[];
+  columnsPerRow?: number;
+  rowsLayout?: boolean;
   backgroundColor?: string;
   borderColor?: string;
-  padding?: "none" | "small" | "medium" | "large";
-}
-
-export interface FormSchema {
-  title: string;
-  titleSize?: number;
-  titleBorderBottom?: boolean;
-  fields: FormField[];
+  padding?: number;
+  showPanelLabel?: boolean; // NEW: Hide/show panel label
 }

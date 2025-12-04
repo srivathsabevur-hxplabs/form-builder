@@ -1,10 +1,12 @@
 // src/components/PropertiesPanel.tsx
+
 import React from "react";
-import { type FormField } from "@/types";
+import { type FormField, type DateFormat } from "@/types";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
 import {
   Select,
   SelectContent,
@@ -12,509 +14,480 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2 } from "lucide-react";
+import { Trash2, Plus } from "lucide-react";
 
 interface PropertiesPanelProps {
-  selectedField: FormField | null;
-  updateField: (id: string, updates: Partial<FormField>) => void;
+  field: FormField | null;
+  onUpdate: (id: string, updates: Partial<FormField>) => void;
 }
 
-export const PropertiesPanel = ({
-  selectedField,
-  updateField,
-}: PropertiesPanelProps) => {
-  if (!selectedField) {
+export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
+  field,
+  onUpdate,
+}) => {
+  if (!field) {
     return (
-      <div className="w-80 bg-gray-50 border-l p-6 flex items-center justify-center text-gray-400">
-        <p className="text-center text-sm">
-          Select a field to edit its properties
-        </p>
+      <div className="w-80 bg-white border-l p-6 flex items-center justify-center text-gray-400">
+        <div className="text-center">
+          <p className="text-sm font-medium">No field selected</p>
+          <p className="text-xs mt-1">Select a field to edit properties</p>
+        </div>
       </div>
     );
   }
 
-  const handleUpdate = (updates: Partial<FormField>) => {
-    updateField(selectedField.id, updates);
-  };
-
-  // Option management functions
   const addOption = () => {
-    const currentOptions = selectedField.options || [];
-    handleUpdate({
-      options: [...currentOptions, `Option ${currentOptions.length + 1}`],
+    const newOption = {
+      label: `Option ${(field.options?.length || 0) + 1}`,
+      value: `option_${(field.options?.length || 0) + 1}`,
+    };
+    onUpdate(field.id, {
+      options: [...(field.options || []), newOption],
     });
   };
 
-  const updateOption = (index: number, value: string) => {
-    const newOptions = [...(selectedField.options || [])];
-    newOptions[index] = value;
-    handleUpdate({ options: newOptions });
+  const updateOption = (
+    index: number,
+    key: "label" | "value",
+    value: string
+  ) => {
+    const updatedOptions = [...(field.options || [])];
+    updatedOptions[index] = { ...updatedOptions[index], [key]: value };
+    onUpdate(field.id, { options: updatedOptions });
   };
 
   const removeOption = (index: number) => {
-    const newOptions = (selectedField.options || []).filter(
-      (_, i) => i !== index
-    );
-    handleUpdate({ options: newOptions });
+    if ((field.options?.length || 0) <= 1) return;
+    const updatedOptions = field.options?.filter((_, i) => i !== index);
+    onUpdate(field.id, { options: updatedOptions });
   };
 
   return (
-    <div className="w-80 bg-gray-50 border-l p-4 overflow-y-auto h-screen">
-      <h2 className="text-lg font-bold mb-4">Field Properties</h2>
-
-      {/* Field Type Badge */}
-      <div className="mb-4 p-2 bg-blue-100 text-blue-800 rounded text-xs font-semibold uppercase text-center">
-        {selectedField.type}
+    <div className="w-80 bg-white border-l overflow-y-auto h-screen">
+      <div className="p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
+        <h2 className="text-lg font-bold text-gray-800">Properties</h2>
+        <p className="text-xs text-gray-500 mt-1">
+          Customize the selected field
+        </p>
       </div>
 
-      <div className="space-y-4">
-        {/* Basic Properties */}
-        <div>
-          <Label className="text-xs font-semibold text-gray-600">
-            Field Label
-          </Label>
-          <Input
-            value={selectedField.label}
-            onChange={(e) => handleUpdate({ label: e.target.value })}
-            className="mt-1"
-          />
+      <div className="p-4 space-y-6">
+        {/* Field Type Badge */}
+        <div className="bg-blue-100 text-blue-800 px-3 py-2 rounded-lg text-xs font-bold uppercase text-center">
+          {field.type}
         </div>
 
-        {selectedField.type === "text" && (
+        {/* Common Properties */}
+        {field.type !== "panel" && (
+          <>
+            {/* Label Text */}
+            <div>
+              <Label className="text-sm font-semibold text-gray-700">
+                Label
+              </Label>
+              <Input
+                value={field.label}
+                onChange={(e) => onUpdate(field.id, { label: e.target.value })}
+                className="mt-1"
+              />
+            </div>
+
+            {/* Show Label Toggle */}
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold text-gray-700">
+                Show Label
+              </Label>
+              <Switch
+                checked={field.showLabel !== false}
+                onCheckedChange={(checked) =>
+                  onUpdate(field.id, { showLabel: checked })
+                }
+              />
+            </div>
+
+            {/* Label Styling */}
+            {field.showLabel !== false && (
+              <div className="space-y-3 p-3 bg-gray-50 rounded-lg">
+                <p className="text-xs font-semibold text-gray-600 uppercase">
+                  Label Style
+                </p>
+
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Bold</Label>
+                  <Switch
+                    checked={field.labelBold || false}
+                    onCheckedChange={(checked) =>
+                      onUpdate(field.id, { labelBold: checked })
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Italic</Label>
+                  <Switch
+                    checked={field.labelItalic || false}
+                    onCheckedChange={(checked) =>
+                      onUpdate(field.id, { labelItalic: checked })
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Underline</Label>
+                  <Switch
+                    checked={field.labelUnderline || false}
+                    onCheckedChange={(checked) =>
+                      onUpdate(field.id, { labelUnderline: checked })
+                    }
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-sm">
+                    Font Size: {field.labelSize || 14}px
+                  </Label>
+                  <Slider
+                    value={[field.labelSize || 14]}
+                    onValueChange={(value) =>
+                      onUpdate(field.id, { labelSize: value[0] })
+                    }
+                    min={10}
+                    max={24}
+                    step={1}
+                    className="mt-2"
+                  />
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Width Control for all fields */}
+        <div>
+          <Label className="text-sm font-semibold text-gray-700">Width</Label>
+          <Select
+            value={field.width || "full"}
+            onValueChange={(value) =>
+              onUpdate(field.id, { width: value as any })
+            }
+          >
+            <SelectTrigger className="mt-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="full">Full (100%)</SelectItem>
+              <SelectItem value="half">Half (50%)</SelectItem>
+              <SelectItem value="third">Third (33%)</SelectItem>
+              <SelectItem value="quarter">Quarter (25%)</SelectItem>
+              <SelectItem value="custom">Custom</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {field.width === "custom" && (
+            <Input
+              value={field.customWidth || ""}
+              onChange={(e) =>
+                onUpdate(field.id, { customWidth: e.target.value })
+              }
+              placeholder="e.g., 250px or 60%"
+              className="mt-2"
+            />
+          )}
+        </div>
+
+        {/* Placeholder for text fields */}
+        {field.type === "text" && (
           <div>
-            <Label className="text-xs font-semibold text-gray-600">
+            <Label className="text-sm font-semibold text-gray-700">
               Placeholder
             </Label>
             <Input
-              value={selectedField.placeholder || ""}
-              onChange={(e) => handleUpdate({ placeholder: e.target.value })}
-              className="mt-1"
+              value={field.placeholder || ""}
+              onChange={(e) =>
+                onUpdate(field.id, { placeholder: e.target.value })
+              }
               placeholder="Enter placeholder text..."
+              className="mt-1"
             />
           </div>
         )}
 
-        {selectedField.type === "description" && (
+        {/* Content for description */}
+        {field.type === "description" && (
           <div>
-            <Label className="text-xs font-semibold text-gray-600">
+            <Label className="text-sm font-semibold text-gray-700">
               Content
             </Label>
             <Textarea
-              value={selectedField.content || ""}
-              onChange={(e) => handleUpdate({ content: e.target.value })}
+              value={field.content || ""}
+              onChange={(e) => onUpdate(field.id, { content: e.target.value })}
+              placeholder="Enter description text..."
               className="mt-1"
               rows={4}
             />
           </div>
         )}
 
-        <Separator />
+        {/* Date Format Selection */}
+        {field.type === "date" && (
+          <div>
+            <Label className="text-sm font-semibold text-gray-700">
+              Date Format
+            </Label>
+            <Select
+              value={field.dateFormat || "MM/DD/YYYY"}
+              onValueChange={(value) =>
+                onUpdate(field.id, { dateFormat: value as DateFormat })
+              }
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
+                <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
+                <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
+                <SelectItem value="DD-MM-YYYY">DD-MM-YYYY</SelectItem>
+                <SelectItem value="MM-DD-YYYY">MM-DD-YYYY</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
-        {/* Options Editor for Radio/Checkbox/Select */}
-        {(selectedField.type === "radio" ||
-          selectedField.type === "checkbox" ||
-          selectedField.type === "select") && (
+        {/* Panel Properties */}
+        {field.type === "panel" && (
           <>
             <div>
-              <Label className="text-xs font-semibold text-gray-600 mb-2 block">
-                Options
+              <Label className="text-sm font-semibold text-gray-700">
+                Panel Title
               </Label>
-              <div className="space-y-2">
-                {(selectedField.options || []).map((option, index) => (
-                  <div key={index} className="flex gap-2">
-                    <Input
-                      value={option}
-                      onChange={(e) => updateOption(index, e.target.value)}
-                      className="h-8 flex-1"
-                      placeholder={`Option ${index + 1}`}
-                    />
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 text-red-500"
-                      onClick={() => removeOption(index)}
-                      disabled={(selectedField.options?.length || 0) <= 1}
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  </div>
-                ))}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full h-8 text-xs"
-                  onClick={addOption}
-                >
-                  <Plus size={12} className="mr-1" /> Add Option
-                </Button>
-              </div>
+              <Input
+                value={field.label}
+                onChange={(e) => onUpdate(field.id, { label: e.target.value })}
+                placeholder="Panel title..."
+                className="mt-1"
+              />
             </div>
-            <Separator />
+
+            {/* Show Panel Label Toggle */}
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold text-gray-700">
+                Show Panel Label
+              </Label>
+              <Switch
+                checked={field.showPanelLabel !== false}
+                onCheckedChange={(checked) =>
+                  onUpdate(field.id, { showPanelLabel: checked })
+                }
+              />
+            </div>
+
+            <div>
+              <Label className="text-sm font-semibold text-gray-700">
+                Columns Per Row: {field.columnsPerRow || 1}
+              </Label>
+              <Slider
+                value={[field.columnsPerRow || 1]}
+                onValueChange={(value) =>
+                  onUpdate(field.id, { columnsPerRow: value[0] })
+                }
+                min={1}
+                max={6}
+                step={1}
+                className="mt-2"
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold text-gray-700">
+                Row-wise Layout
+              </Label>
+              <Switch
+                checked={field.rowsLayout || false}
+                onCheckedChange={(checked) =>
+                  onUpdate(field.id, { rowsLayout: checked })
+                }
+              />
+            </div>
+
+            <div>
+              <Label className="text-sm font-semibold text-gray-700">
+                Background Color
+              </Label>
+              <Input
+                type="color"
+                value={field.backgroundColor || "#ffffff"}
+                onChange={(e) =>
+                  onUpdate(field.id, { backgroundColor: e.target.value })
+                }
+                className="mt-1 h-10"
+              />
+            </div>
+
+            <div>
+              <Label className="text-sm font-semibold text-gray-700">
+                Border Color
+              </Label>
+              <Input
+                type="color"
+                value={field.borderColor || "#e5e7eb"}
+                onChange={(e) =>
+                  onUpdate(field.id, { borderColor: e.target.value })
+                }
+                className="mt-1 h-10"
+              />
+            </div>
+
+            <div>
+              <Label className="text-sm font-semibold text-gray-700">
+                Padding: {field.padding || 16}px
+              </Label>
+              <Slider
+                value={[field.padding || 16]}
+                onValueChange={(value) =>
+                  onUpdate(field.id, { padding: value[0] })
+                }
+                min={0}
+                max={48}
+                step={4}
+                className="mt-2"
+              />
+            </div>
           </>
         )}
 
-        {/* Label Styling */}
-        <div>
-          <Label className="text-xs font-semibold text-gray-600 mb-2 block">
-            Label Style
-          </Label>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Show Label</Label>
-              <Switch
-                checked={selectedField.showLabel !== false}
-                onCheckedChange={(checked) =>
-                  handleUpdate({ showLabel: checked })
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Bold</Label>
-              <Switch
-                checked={selectedField.labelBold || false}
-                onCheckedChange={(checked) =>
-                  handleUpdate({ labelBold: checked })
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Italic</Label>
-              <Switch
-                checked={selectedField.labelItalic || false}
-                onCheckedChange={(checked) =>
-                  handleUpdate({ labelItalic: checked })
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Underline</Label>
-              <Switch
-                checked={selectedField.labelUnderline || false}
-                onCheckedChange={(checked) =>
-                  handleUpdate({ labelUnderline: checked })
-                }
-              />
-            </div>
-
-            <div>
-              <Label className="text-xs block mb-1">Label Size</Label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="range"
-                  min="10"
-                  max="24"
-                  value={selectedField.labelSize || 14}
-                  onChange={(e) =>
-                    handleUpdate({ labelSize: parseInt(e.target.value) })
-                  }
-                  className="flex-1"
-                />
-                <span className="text-xs w-8 text-right">
-                  {selectedField.labelSize || 14}px
-                </span>
-              </div>
+        {/* Options for Radio/Checkbox/Select with Value Mapping */}
+        {(field.type === "radio" ||
+          field.type === "checkbox" ||
+          field.type === "select") && (
+          <div>
+            <Label className="text-sm font-semibold text-gray-700 mb-2 block">
+              Options
+            </Label>
+            <div className="space-y-2">
+              {field.options?.map((option, index) => (
+                <div key={index} className="space-y-1">
+                  <div className="flex gap-2">
+                    <Input
+                      value={option.label}
+                      onChange={(e) =>
+                        updateOption(index, "label", e.target.value)
+                      }
+                      placeholder="Label"
+                      className="flex-1"
+                    />
+                    {(field.options?.length || 0) > 1 && (
+                      <Button
+                        onClick={() => removeOption(index)}
+                        variant="ghost"
+                        size="icon"
+                        className="h-10 w-10 text-red-500 hover:bg-red-50"
+                      >
+                        <Trash2 size={16} />
+                      </Button>
+                    )}
+                  </div>
+                  <Input
+                    value={option.value}
+                    onChange={(e) =>
+                      updateOption(index, "value", e.target.value)
+                    }
+                    placeholder="Value"
+                    className="text-sm"
+                  />
+                </div>
+              ))}
+              <Button
+                onClick={addOption}
+                variant="outline"
+                size="sm"
+                className="w-full mt-2"
+              >
+                <Plus size={14} className="mr-1" />
+                Add Option
+              </Button>
             </div>
           </div>
-        </div>
+        )}
 
-        <Separator />
-
-        {/* Field Styling */}
-        <div>
-          <Label className="text-xs font-semibold text-gray-600 mb-2 block">
-            Field Style
-          </Label>
-
-          <div className="space-y-2">
-            {selectedField.type === "text" && (
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Underline Input</Label>
-                <Switch
-                  checked={selectedField.underline || false}
-                  onCheckedChange={(checked) =>
-                    handleUpdate({ underline: checked })
-                  }
-                />
-              </div>
-            )}
-
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Bottom Border</Label>
-              <Switch
-                checked={selectedField.borderBottom || false}
-                onCheckedChange={(checked) =>
-                  handleUpdate({ borderBottom: checked })
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Required</Label>
-              <Switch
-                checked={selectedField.required || false}
-                onCheckedChange={(checked) =>
-                  handleUpdate({ required: checked })
-                }
-              />
-            </div>
+        {/* Layout Options for Radio/Checkbox */}
+        {(field.type === "radio" || field.type === "checkbox") && (
+          <div className="space-y-3 p-3 bg-gray-50 rounded-lg">
+            <p className="text-xs font-semibold text-gray-600 uppercase">
+              Layout Options
+            </p>
 
             <div>
-              <Label className="text-xs block mb-1">Field Size</Label>
+              <Label className="text-sm">Layout Direction</Label>
               <Select
-                value={selectedField.fieldSize || "medium"}
+                value={field.layoutDirection || "column"}
                 onValueChange={(value) =>
-                  handleUpdate({ fieldSize: value as any })
+                  onUpdate(field.id, { layoutDirection: value as any })
                 }
               >
-                <SelectTrigger className="h-8">
+                <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="small">Small</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="large">Large</SelectItem>
+                  <SelectItem value="row">Row</SelectItem>
+                  <SelectItem value="column">Column</SelectItem>
+                  <SelectItem value="grid">Grid</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-          </div>
-        </div>
 
-        <Separator />
-
-        {/* Helper Text */}
-        <div>
-          <Label className="text-xs font-semibold text-gray-600">
-            Helper Text
-          </Label>
-          <Input
-            value={selectedField.helperText || ""}
-            onChange={(e) => handleUpdate({ helperText: e.target.value })}
-            className="mt-1"
-            placeholder="Optional help text..."
-          />
-        </div>
-
-        {/* Layout options for Radio/Checkbox */}
-        {(selectedField.type === "radio" ||
-          selectedField.type === "checkbox") && (
-          <>
-            <Separator />
-            <div>
-              <Label className="text-xs font-semibold text-gray-600 mb-2 block">
-                Layout
-              </Label>
-
-              <div className="space-y-2">
-                <div>
-                  <Label className="text-xs block mb-1">Direction</Label>
-                  <Select
-                    value={selectedField.direction || "column"}
-                    onValueChange={(value) =>
-                      handleUpdate({ direction: value as any })
-                    }
-                  >
-                    <SelectTrigger className="h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="column">Column</SelectItem>
-                      <SelectItem value="row">Row</SelectItem>
-                      <SelectItem value="grid">Grid</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {selectedField.direction === "grid" && (
-                  <div>
-                    <Label className="text-xs block mb-1">Grid Columns</Label>
-                    <Input
-                      type="number"
-                      min={2}
-                      max={6}
-                      value={selectedField.gridColumns || 2}
-                      onChange={(e) =>
-                        handleUpdate({ gridColumns: parseInt(e.target.value) })
-                      }
-                      className="h-8"
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <Label className="text-xs block mb-1">List Style</Label>
-                  <Select
-                    value={selectedField.listStyle || "none"}
-                    onValueChange={(value) =>
-                      handleUpdate({ listStyle: value as any })
-                    }
-                  >
-                    <SelectTrigger className="h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      <SelectItem value="numbered">1, 2, 3...</SelectItem>
-                      <SelectItem value="alpha">A, B, C...</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+            {field.layoutDirection === "grid" && (
+              <div>
+                <Label className="text-sm">
+                  Grid Columns: {field.gridColumns || 2}
+                </Label>
+                <Slider
+                  value={[field.gridColumns || 2]}
+                  onValueChange={(value) =>
+                    onUpdate(field.id, { gridColumns: value[0] })
+                  }
+                  min={2}
+                  max={4}
+                  step={1}
+                  className="mt-2"
+                />
               </div>
-            </div>
-          </>
+            )}
+          </div>
         )}
 
-        {/* Panel-specific properties */}
-        {selectedField.type === "panel" && (
-          <>
-            <Separator />
-            <div>
-              <Label className="text-xs font-semibold text-gray-600 mb-2 block">
-                Panel Layout
-              </Label>
+        {/* Required Toggle */}
+        {field.type !== "panel" && field.type !== "description" && (
+          <div className="flex items-center justify-between">
+            <Label className="text-sm font-semibold text-gray-700">
+              Required
+            </Label>
+            <Switch
+              checked={field.required || false}
+              onCheckedChange={(checked) =>
+                onUpdate(field.id, { required: checked })
+              }
+            />
+          </div>
+        )}
 
-              <div className="space-y-2">
-                <div>
-                  <Label className="text-xs block mb-1">Width</Label>
-                  <Select
-                    value={selectedField.panelWidth || "full"}
-                    onValueChange={(value) =>
-                      handleUpdate({ panelWidth: value as any })
-                    }
-                  >
-                    <SelectTrigger className="h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="full">Full Width (100%)</SelectItem>
-                      <SelectItem value="half">Half Width (50%)</SelectItem>
-                      <SelectItem value="third">Third Width (33%)</SelectItem>
-                      <SelectItem value="two-thirds">
-                        Two Thirds (66%)
-                      </SelectItem>
-                      <SelectItem value="quarter">
-                        Quarter Width (25%)
-                      </SelectItem>
-                      <SelectItem value="custom">Custom Width</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {selectedField.panelWidth === "custom" && (
-                  <div>
-                    <Label className="text-xs block mb-1">
-                      Custom Width (%)
-                    </Label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="range"
-                        min="10"
-                        max="100"
-                        value={selectedField.customWidth || 100}
-                        onChange={(e) =>
-                          handleUpdate({
-                            customWidth: parseInt(e.target.value),
-                          })
-                        }
-                        className="flex-1"
-                      />
-                      <span className="text-xs w-12 text-right">
-                        {selectedField.customWidth || 100}%
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <Label className="text-xs block mb-1">Columns Per Row</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={6}
-                    value={selectedField.columnsPerRow || 1}
-                    onChange={(e) =>
-                      handleUpdate({ columnsPerRow: parseInt(e.target.value) })
-                    }
-                    className="h-8"
-                  />
-                  <p className="text-xs text-gray-400 mt-1">
-                    How many fields can fit in one row
-                  </p>
-                </div>
-
-                <div>
-                  <Label className="text-xs block mb-1">Padding</Label>
-                  <Select
-                    value={selectedField.padding || "medium"}
-                    onValueChange={(value) =>
-                      handleUpdate({ padding: value as any })
-                    }
-                  >
-                    <SelectTrigger className="h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      <SelectItem value="small">Small</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="large">Large</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label className="text-xs block mb-1">Background Color</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="color"
-                      value={selectedField.backgroundColor || "#ffffff"}
-                      onChange={(e) =>
-                        handleUpdate({ backgroundColor: e.target.value })
-                      }
-                      className="h-8 w-16"
-                    />
-                    <Input
-                      type="text"
-                      value={selectedField.backgroundColor || "#ffffff"}
-                      onChange={(e) =>
-                        handleUpdate({ backgroundColor: e.target.value })
-                      }
-                      className="h-8 flex-1"
-                      placeholder="#ffffff"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label className="text-xs block mb-1">Border Color</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="color"
-                      value={selectedField.borderColor || "#e5e7eb"}
-                      onChange={(e) =>
-                        handleUpdate({ borderColor: e.target.value })
-                      }
-                      className="h-8 w-16"
-                    />
-                    <Input
-                      type="text"
-                      value={selectedField.borderColor || "#e5e7eb"}
-                      onChange={(e) =>
-                        handleUpdate({ borderColor: e.target.value })
-                      }
-                      className="h-8 flex-1"
-                      placeholder="#e5e7eb"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </>
+        {/* Helper Text */}
+        {field.type !== "panel" && (
+          <div>
+            <Label className="text-sm font-semibold text-gray-700">
+              Helper Text
+            </Label>
+            <Textarea
+              value={field.helperText || ""}
+              onChange={(e) =>
+                onUpdate(field.id, { helperText: e.target.value })
+              }
+              placeholder="Add helper text..."
+              className="mt-1"
+              rows={2}
+            />
+          </div>
         )}
       </div>
     </div>

@@ -1,23 +1,25 @@
-// src/Editor.tsx
+// src/pages/Editor.tsx
+
 import React, { useState, useCallback } from "react";
 import { useDrop } from "react-dnd";
 import { type FormField, ItemTypes, type FieldType } from "@/types";
 import { EditorField } from "@/components/EditorField";
 import { PanelField } from "@/components/PanelField";
 import { PropertiesPanel } from "@/components/PropertiesPanel";
+import { FormPreview } from "@/pages/FormPreview";
+import { Button } from "@/components/ui/button";
+import { Eye } from "lucide-react";
 
 export const Editor = () => {
   const [fields, setFields] = useState<FormField[]>([]);
   const [title, setTitle] = useState("My Drag & Drop Form");
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
-  // Find selected field (could be top-level or nested in panel)
   const getSelectedField = (): FormField | null => {
-    // Check top level
     const topLevel = fields.find((f) => f.id === selectedFieldId);
     if (topLevel) return topLevel;
 
-    // Check inside panels
     for (const field of fields) {
       if (field.type === "panel" && field.children) {
         const nested = field.children.find((c) => c.id === selectedFieldId);
@@ -29,8 +31,8 @@ export const Editor = () => {
 
   const selectedField = getSelectedField();
 
-  const addField = useCallback((type: FieldType) => {
-    const baseField = {
+  const createBaseField = (type: FieldType): FormField => {
+    const baseField: FormField = {
       id: crypto.randomUUID(),
       type,
       label: `New ${type} Field`,
@@ -43,117 +45,128 @@ export const Editor = () => {
       underline: false,
       borderBottom: false,
       required: false,
-      fieldSize: "medium" as const,
+      width: "full",
+      dateFormat: type === "date" ? "MM/DD/YYYY" : undefined,
     };
 
-    let newField: FormField;
-
     if (type === "panel") {
-      newField = {
+      return {
         ...baseField,
         label: "Panel Container",
-        panelWidth: "full",
-        columnsPerRow: 1,
+        columnsPerRow: 2,
+        rowsLayout: true,
         children: [],
-        backgroundColor: "#ffffff",
+        backgroundColor: "#f9fafb",
         borderColor: "#e5e7eb",
-        padding: "medium",
+        padding: 16,
+        showPanelLabel: true,
       };
     } else if (["radio", "checkbox", "select"].includes(type)) {
-      newField = {
+      return {
         ...baseField,
-        options: ["Option 1", "Option 2", "Option 3"],
-        direction: ["radio", "checkbox"].includes(type) ? "column" : undefined,
-        gridColumns: ["radio", "checkbox"].includes(type) ? 2 : undefined,
-        listStyle: ["radio", "checkbox"].includes(type) ? "none" : undefined,
+        options: [
+          { label: "Option 1", value: "option_1" },
+          { label: "Option 2", value: "option_2" },
+          { label: "Option 3", value: "option_3" },
+        ],
+        layoutDirection: ["radio", "checkbox"].includes(type)
+          ? "column"
+          : undefined,
+        gridColumns: 2,
       };
     } else if (type === "description") {
-      newField = {
+      return {
         ...baseField,
         content: "Enter your description here...",
       };
-    } else if (type === "dynamic-table") {
-      newField = {
-        ...baseField,
-        columns: [
-          { id: "c1", header: "Column 1", width: "50%" },
-          { id: "c2", header: "Column 2", width: "50%" },
-        ],
-        tableData: [
-          { c1: "", c2: "" },
-          { c1: "", c2: "" },
-        ],
-      };
-    } else {
-      newField = baseField;
     }
 
+    return baseField;
+  };
+
+  const addField = useCallback((type: FieldType) => {
+    const newField = createBaseField(type);
     setFields((prev) => [...prev, newField]);
     setSelectedFieldId(newField.id);
   }, []);
 
-  const addFieldToPanel = useCallback((panelId: string, type: FieldType) => {
-    const baseField = {
-      id: crypto.randomUUID(),
-      type,
-      label: `New ${type} Field`,
-      value: type === "checkbox" ? [] : "",
-      showLabel: true,
-      labelBold: false,
-      labelItalic: false,
-      labelUnderline: false,
-      labelSize: 14,
-      underline: false,
-      borderBottom: false,
-      required: false,
-      fieldSize: "medium" as const,
-    };
+  const addFieldToPanel = useCallback(
+    (panelId: string, fieldData: FormField) => {
+      setFields((prev) => {
+        // Remove field from its current location
+        let fieldToAdd = fieldData;
+        let fieldExists = false;
 
-    let newField: FormField;
-
-    if (["radio", "checkbox", "select"].includes(type)) {
-      newField = {
-        ...baseField,
-        options: ["Option 1", "Option 2", "Option 3"],
-        direction: ["radio", "checkbox"].includes(type) ? "column" : undefined,
-        gridColumns: ["radio", "checkbox"].includes(type) ? 2 : undefined,
-        listStyle: ["radio", "checkbox"].includes(type) ? "none" : undefined,
-      };
-    } else if (type === "description") {
-      newField = {
-        ...baseField,
-        content: "Enter your description here...",
-      };
-    } else if (type === "dynamic-table") {
-      newField = {
-        ...baseField,
-        columns: [
-          { id: "c1", header: "Column 1", width: "50%" },
-          { id: "c2", header: "Column 2", width: "50%" },
-        ],
-        tableData: [
-          { c1: "", c2: "" },
-          { c1: "", c2: "" },
-        ],
-      };
-    } else {
-      newField = baseField;
-    }
-
-    setFields((prev) =>
-      prev.map((f) => {
-        if (f.id === panelId && f.type === "panel") {
-          return {
-            ...f,
-            children: [...(f.children || []), newField],
-          };
+        // Check if field exists at top level
+        const topLevelField = prev.find((f) => f.id === fieldData.id);
+        if (topLevelField) {
+          fieldToAdd = topLevelField;
+          fieldExists = true;
         }
-        return f;
-      })
-    );
 
-    setSelectedFieldId(newField.id);
-  }, []);
+        // Check if field exists in any panel
+        for (const field of prev) {
+          if (field.type === "panel" && field.children) {
+            const childField = field.children.find(
+              (c) => c.id === fieldData.id
+            );
+            if (childField) {
+              fieldToAdd = childField;
+              fieldExists = true;
+              break;
+            }
+          }
+        }
+
+        // Remove from all locations
+        let newFields = prev.filter((f) => f.id !== fieldData.id);
+        newFields = newFields.map((f) => {
+          if (f.type === "panel" && f.children) {
+            return {
+              ...f,
+              children: f.children.filter((child) => child.id !== fieldData.id),
+            };
+          }
+          return f;
+        });
+
+        // Add to target panel
+        return newFields.map((f) => {
+          if (f.id === panelId && f.type === "panel") {
+            return {
+              ...f,
+              children: [...(f.children || []), fieldToAdd],
+            };
+          }
+          return f;
+        });
+      });
+
+      setSelectedFieldId(fieldData.id);
+    },
+    []
+  );
+
+  const removeFieldFromPanel = useCallback(
+    (panelId: string, fieldId: string) => {
+      setFields((prev) =>
+        prev.map((f) => {
+          if (f.id === panelId && f.type === "panel" && f.children) {
+            return {
+              ...f,
+              children: f.children.filter((child) => child.id !== fieldId),
+            };
+          }
+          return f;
+        })
+      );
+
+      if (selectedFieldId === fieldId) {
+        setSelectedFieldId(null);
+      }
+    },
+    [selectedFieldId]
+  );
 
   const moveField = useCallback((dragIndex: number, hoverIndex: number) => {
     setFields((prevFields) => {
@@ -170,7 +183,6 @@ export const Editor = () => {
         if (f.id === id) {
           return { ...f, ...updates };
         }
-        // Also check if field is inside a panel
         if (f.type === "panel" && f.children) {
           return {
             ...f,
@@ -187,15 +199,10 @@ export const Editor = () => {
   const removeField = useCallback(
     (id: string) => {
       setFields((prev) => {
-        // First, try to remove from top level
         const filtered = prev.filter((f) => f.id !== id);
-
-        // If length changed, field was at top level
         if (filtered.length !== prev.length) {
           return filtered;
         }
-
-        // Otherwise, check inside panels
         return prev.map((f) => {
           if (f.type === "panel" && f.children) {
             return {
@@ -215,11 +222,41 @@ export const Editor = () => {
   );
 
   const [{ isOver }, drop] = useDrop(() => ({
-    accept: ItemTypes.TOOL,
-    drop: (item: { type: FieldType }, monitor) => {
-      // Only add if not dropped on a nested target
-      if (!monitor.didDrop()) {
-        addField(item.type);
+    accept: [ItemTypes.TOOL, ItemTypes.FIELD],
+    drop: (item: any, monitor) => {
+      // Don't handle if already handled by child
+      if (monitor.didDrop()) return;
+
+      if (item.type === ItemTypes.FIELD && item.fieldData) {
+        // Field dropped back to main form from panel
+        const fieldData = item.fieldData;
+
+        setFields((prev) => {
+          // Remove from any panel
+          const newFields = prev.map((f) => {
+            if (f.type === "panel" && f.children) {
+              return {
+                ...f,
+                children: f.children.filter(
+                  (child) => child.id !== fieldData.id
+                ),
+              };
+            }
+            return f;
+          });
+
+          // Add to main form if not already there
+          if (!newFields.find((f) => f.id === fieldData.id)) {
+            return [...newFields, fieldData];
+          }
+          return newFields;
+        });
+      } else if (
+        item.type &&
+        typeof item.type === "string" &&
+        item.type !== ItemTypes.FIELD
+      ) {
+        addField(item.type as FieldType);
       }
     },
     collect: (monitor) => ({
@@ -228,66 +265,90 @@ export const Editor = () => {
   }));
 
   return (
-    <div className="flex flex-1">
-      <div
-        ref={drop}
-        className={`flex-1 p-6 md:p-10 bg-white min-h-screen transition-colors ${
-          isOver ? "bg-blue-50" : ""
-        }`}
-      >
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="text-4xl font-bold w-full mb-8 border-b-2 border-transparent hover:border-gray-200 focus:border-blue-500 outline-none bg-transparent transition-colors"
-          placeholder="Form Title"
-        />
-
-        <div className="space-y-4">
-          {fields.map((field, index) =>
-            field.type === "panel" ? (
-              <PanelField
-                key={field.id}
-                field={field}
-                index={index}
-                moveField={moveField}
-                updateField={updateField}
-                removeField={removeField}
-                isSelected={selectedFieldId === field.id}
-                onSelect={() => setSelectedFieldId(field.id)}
-                onSelectChild={(childId) => setSelectedFieldId(childId)}
-                addFieldToPanel={addFieldToPanel}
-              />
-            ) : (
-              <EditorField
-                key={field.id}
-                field={field}
-                index={index}
-                moveField={moveField}
-                updateField={updateField}
-                removeField={removeField}
-                isSelected={selectedFieldId === field.id}
-                onSelect={() => setSelectedFieldId(field.id)}
-              />
-            )
-          )}
+    <div className="flex h-screen bg-gray-50">
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <div className="px-6 py-4 border-b bg-white flex items-center gap-4 shadow-sm">
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="text-3xl font-bold flex-1 border-b-2 border-transparent hover:border-gray-300 focus:border-blue-500 outline-none bg-transparent transition-colors"
+            placeholder="Form Title"
+          />
+          <Button
+            onClick={() => setShowPreview(true)}
+            className="gap-2"
+            size="lg"
+          >
+            <Eye size={18} />
+            Preview
+          </Button>
         </div>
 
-        {fields.length === 0 && (
-          <div className="text-center py-24 text-gray-400 border-2 border-dashed rounded-lg flex flex-col items-center justify-center">
-            <p className="font-semibold text-lg mb-2">
-              Drop a control here to start building
-            </p>
-            <p className="text-sm">Drag field types from the left sidebar</p>
+        {/* Canvas */}
+        <div
+          ref={drop}
+          className={`flex-1 p-8 overflow-y-auto ${
+            isOver ? "bg-blue-50" : ""
+          } transition-colors`}
+        >
+          <div className="max-w-5xl mx-auto space-y-4">
+            {fields.map((field, index) =>
+              field.type === "panel" ? (
+                <PanelField
+                  key={field.id}
+                  field={field}
+                  index={index}
+                  moveField={moveField}
+                  updateField={updateField}
+                  removeField={removeField}
+                  isSelected={selectedFieldId === field.id}
+                  onSelect={() => setSelectedFieldId(field.id)}
+                  onSelectChild={(childId) => setSelectedFieldId(childId)}
+                  addFieldToPanel={addFieldToPanel}
+                  removeFieldFromPanel={removeFieldFromPanel}
+                  selectedChildId={selectedFieldId}
+                />
+              ) : (
+                <EditorField
+                  key={field.id}
+                  field={field}
+                  index={index}
+                  moveField={moveField}
+                  updateField={updateField}
+                  removeField={removeField}
+                  isSelected={selectedFieldId === field.id}
+                  onSelect={() => setSelectedFieldId(field.id)}
+                />
+              )
+            )}
+
+            {fields.length === 0 && (
+              <div className="text-center py-32 text-gray-400 border-2 border-dashed rounded-lg bg-white">
+                <p className="font-semibold text-xl mb-2">
+                  Drop a control here to start building
+                </p>
+                <p className="text-sm">
+                  Drag field types from the left sidebar
+                </p>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
       {/* Properties Panel */}
-      <PropertiesPanel
-        selectedField={selectedField}
-        updateField={updateField}
-      />
+      <PropertiesPanel field={selectedField} onUpdate={updateField} />
+
+      {/* Preview Modal */}
+      {showPreview && (
+        <FormPreview
+          title={title}
+          fields={fields}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
     </div>
   );
 };
